@@ -2,6 +2,8 @@
 
 Automated weekly inventory report generator for York University's Making & Media Creation Lab (MMCL). This script fetches equipment data from LibCal's API, merges availability status, and generates Excel and CSV reports.
 
+The automatially-scheduled should will create datestamped files in the `output/` directory.
+
 ## Features
 
 - 🤖 **Automated Weekly Reports**: Runs every Friday at 9:00 AM EST via GitHub Actions
@@ -9,63 +11,6 @@ Automated weekly inventory report generator for York University's Making & Media
 - 🔄 **Checkout Status Tracking**: Shows which items are checked out vs. available
 - 🧹 **Automatic Cleanup**: Deletes reports older than 3 months
 - 🔒 **Secure Credentials**: Uses GitHub Secrets for API credentials
-
-## Setup Instructions
-
-### 1. Create a New GitHub Repository
-
-1. Create a new repository on GitHub (e.g., `mmcl-weekly-inventory`)
-2. Clone the repository to your local machine
-
-### 2. Add Files to Repository
-
-Copy the following files from this project into your repository:
-
-```
-mmcl-weekly-inventory/
-├── .github/
-│   └── workflows/
-│       └── weekly-inventory.yml
-├── generate_inventory.py
-├── requirements.txt
-├── README.md
-└── .gitignore
-```
-
-### 3. Configure GitHub Secrets
-
-Go to your repository's **Settings → Secrets and variables → Actions** and add:
-
-#### Secrets (Repository secrets)
-- `LIBCAL_CLIENT_ID`: Your LibCal API client ID
-- `LIBCAL_CLIENT_SECRET`: Your LibCal API client secret
-
-#### Variables (Repository variables)
-- `LIBCAL_LOCATION_ID`: Your location ID (default: `2632` for Scott MCL)
-
-**To add secrets:**
-1. Go to repository Settings
-2. Click on "Secrets and variables" → "Actions"
-3. Click "New repository secret"
-4. Add name and value
-5. Click "Add secret"
-
-### 4. Enable GitHub Actions
-
-1. Go to the **Actions** tab in your repository
-2. If prompted, enable GitHub Actions for your repository
-3. The workflow will appear as "Weekly Equipment Inventory Report"
-
-### 5. Test the Workflow
-
-Before waiting for the scheduled run, test the workflow manually:
-
-1. Go to **Actions** tab
-2. Click on "Weekly Equipment Inventory Report" workflow
-3. Click "Run workflow" button
-4. Select the branch and click "Run workflow"
-
-The workflow should complete successfully and create files in the `output/` directory.
 
 ## How It Works
 
