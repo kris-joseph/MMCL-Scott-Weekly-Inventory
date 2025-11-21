@@ -125,26 +125,43 @@ def generate_inventory_report():
     inventory_df = pd.DataFrame(items_data)
     status_df = pd.DataFrame(status_data)
     
+    print(f"  Items endpoint: {len(inventory_df)} items")
+    print(f"  Status endpoint: {len(status_df)} items")
+    
     # Keep only needed columns from status data and rename eid to id
     status_columns = ['eid', 'barcode', 'is_checked_out']
     status_df = status_df[status_columns].copy()
     status_df.rename(columns={'eid': 'id'}, inplace=True)
     
-    # Merge on equipment ID
+    # FULL OUTER JOIN - Keep ALL items from both endpoints
     inventory_df = inventory_df.merge(
         status_df[['id', 'is_checked_out']], 
         on='id', 
-        how='left'
+        how='outer',  # Changed from 'left' to 'outer'
+        indicator=True  # Add column showing which dataset each row came from
     )
+    
+    # Report on merge results
+    merge_stats = inventory_df['_merge'].value_counts()
+    print(f"\n  Merge statistics:")
+    print(f"    Matched on ID: {merge_stats.get('both', 0)}")
+    print(f"    Only in items endpoint: {merge_stats.get('left_only', 0)}")
+    print(f"    Only in status endpoint: {merge_stats.get('right_only', 0)}")
     
     # Handle items that didn't match by ID - try barcode match
     missing_status = inventory_df['is_checked_out'].isna()
     if missing_status.any():
-        print(f"Warning: {missing_status.sum()} items did not match by ID, attempting barcode match...")
+        print(f"\n  Attempting barcode match for {missing_status.sum()} unmatched items...")
         barcode_status = status_df[['barcode', 'is_checked_out']].copy()
         barcode_status.rename(columns={'is_checked_out': 'is_checked_out_barcode'}, inplace=True)
         
         inventory_df = inventory_df.merge(barcode_status, on='barcode', how='left')
+        
+        # Count how many matched by barcode
+        barcode_matches = (~inventory_df.loc[missing_status, 'is_checked_out_barcode'].isna()).sum()
+        if barcode_matches > 0:
+            print(f"    Successfully matched {barcode_matches} items by barcode")
+        
         inventory_df.loc[missing_status, 'is_checked_out'] = inventory_df.loc[missing_status, 'is_checked_out_barcode']
         inventory_df.drop('is_checked_out_barcode', axis=1, inplace=True)
     
@@ -156,9 +173,12 @@ def generate_inventory_report():
         lambda x: 'CHECKED OUT' if x else 'Available'
     )
     
-    print(f"Merge complete. Final inventory has {len(inventory_df)} items")
-    print(f"Items checked out: {(inventory_df['is_checked_out'] == True).sum()}")
-    print(f"Items available: {(inventory_df['is_checked_out'] == False).sum()}")
+    # Drop the merge indicator column
+    inventory_df.drop('_merge', axis=1, inplace=True, errors='ignore')
+    
+    print(f"\nMerge complete. Final inventory has {len(inventory_df)} items")
+    print(f"  Items checked out: {(inventory_df['is_checked_out'] == True).sum()}")
+    print(f"  Items available: {(inventory_df['is_checked_out'] == False).sum()}")
     
     # Step 5: Clean up data
     # Drop unnecessary columns
@@ -167,9 +187,28 @@ def generate_inventory_report():
                        'locationTermsAndConditions', 'groupName', 'model', 'is_checked_out']
     inventory_df.drop(columns_to_drop, axis=1, inplace=True, errors='ignore')
     
-    # Remove HTML tags from damage notes
-    inventory_df['damage_notes'] = inventory_df['damage_notes'].replace(r'<[^<>]*>', '', regex=True)
+    # Ensure all required columns exist (fill with empty strings if missing from status-only items)
+    required_columns = ['name', 'barcode', 'asset_number', 'serial_number', 'damage_notes']
+    for col in required_columns:
+        if col not in inventory_df.columns:
+            inventory_df[col] = ""
+        else:
+            # Fill NaN values with empty strings
+            inventory_df[col] = inventory_df[col].fillna("")
+    
+    # Remove HTML tags and entities from damage notes (only for non-empty values)
+    inventory_df['damage_notes'] = inventory_df['damage_notes'].astype(str).replace(r'<[^<>]*>', '', regex=True)
+    # Replace common HTML entities
+    inventory_df['damage_notes'] = inventory_df['damage_notes'].replace(r'&nbsp;', ' ', regex=True)
+    inventory_df['damage_notes'] = inventory_df['damage_notes'].replace(r'&amp;', '&', regex=True)
+    inventory_df['damage_notes'] = inventory_df['damage_notes'].replace(r'&lt;', '<', regex=True)
+    inventory_df['damage_notes'] = inventory_df['damage_notes'].replace(r'&gt;', '>', regex=True)
+    inventory_df['damage_notes'] = inventory_df['damage_notes'].replace(r'&quot;', '"', regex=True)
+    inventory_df['damage_notes'] = inventory_df['damage_notes'].replace(r'&#39;', "'", regex=True)
+    # Clean up whitespace
     inventory_df['damage_notes'] = inventory_df['damage_notes'].replace(r'[\r\n|\r|\n|\t]', ' ', regex=True)
+    inventory_df['damage_notes'] = inventory_df['damage_notes'].replace(r'\s+', ' ', regex=True)  # Multiple spaces to single
+    inventory_df['damage_notes'] = inventory_df['damage_notes'].str.strip()  # Remove leading/trailing spaces
     
     # Add DSA Notes column
     inventory_df['DSA_Notes'] = ""
