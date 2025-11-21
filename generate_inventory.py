@@ -212,7 +212,7 @@ def generate_inventory_report():
             "Serial#",
             "Checkout Status",
             "Add Notes Here for Any Issues Found",
-            "Current Notes on Damage"
+            "LibCal's Current Notes on Damage"
         ]
         
         # Add formatted table
